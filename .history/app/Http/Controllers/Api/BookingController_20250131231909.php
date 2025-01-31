@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Seat;
 use App\Models\Booking;
-use Illuminate\Support\Facades\DB;
 
 class BookingController extends Controller
 {
@@ -29,23 +28,25 @@ class BookingController extends Controller
             'end_station_id.exists' => 'The specified end station does not exist.',
         ]);
 
-        // Start a database transaction
-        DB::beginTransaction();
+        // Find the seat
+        $seat = Seat::find($request->seat_id);
+        $bus = $seat->bus;
+        $trip = $bus->trip;
 
+        // Check if the seat is already booked for the given stations
+        $isSeatAvailable = !$seat->bookings()
+            ->where(function ($query) use ($request) {
+                $query->whereBetween('start_station_id', [$request->start_station_id, $request->end_station_id])
+                      ->orWhereBetween('end_station_id', [$request->start_station_id, $request->end_station_id]);
+            })
+            ->exists();
+
+        if (!$isSeatAvailable) {
+            return response()->json(['message' => 'Seat is not available for the selected stations'], 400);
+        }
+
+        // Create the booking
         try {
-            // Check if the seat is already booked for the given stations
-            $isSeatAvailable = !Booking::where('seat_id', $request->seat_id)
-                ->where(function ($query) use ($request) {
-                    $query->whereBetween('start_station_id', [$request->start_station_id, $request->end_station_id])
-                          ->orWhereBetween('end_station_id', [$request->start_station_id, $request->end_station_id]);
-                })
-                ->exists();
-
-            if (!$isSeatAvailable) {
-                return response()->json(['message' => 'Seat is not available for the selected stations'], 400);
-            }
-
-            // Create the booking
             $booking = Booking::create([
                 'user_id' => $request->user_id,
                 'seat_id' => $request->seat_id,
@@ -53,14 +54,8 @@ class BookingController extends Controller
                 'end_station_id' => $request->end_station_id,
             ]);
 
-            // Commit the transaction
-            DB::commit();
-
             return response()->json(['message' => 'Seat booked successfully', 'booking' => $booking], 201);
         } catch (\Exception $e) {
-            // Rollback the transaction in case of an error
-            DB::rollBack();
-
             return response()->json(['message' => 'An error occurred while booking the seat', 'error' => $e->getMessage()], 500);
         }
     }
