@@ -42,7 +42,7 @@ CREATE DATABASE smartfleet;
 ```
 
 Import the database dump:
-Locate the SQL file in the `database/` folder (e.g., `smartfleet_dump.sql`).
+Locate the SQL file in the smart fleet.sql.
 Import it into your database using a tool like phpMyAdmin or the MySQL command line:
 ```bash
 mysql -u your_username -p smartfleet < database/smartfleet_dump.sql
